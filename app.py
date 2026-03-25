@@ -6,16 +6,15 @@ import os
 # --- ASTREIA 独立構成 ---
 STABLE_MODEL = "gemini-2.5-flash"
 THINKING_MODE = "high"
-ASTREIA_PRIVATE_MEMORY = "astreia_memory.txt"  # 彼女だけの秘密の記憶
+ASTREIA_PRIVATE_MEMORY = "astreia_memory.txt"
 
 st.set_page_config(page_title="ASTREIA", page_icon="✨")
 
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.error("APIキーを設定してください。")
+    st.error("APIキーをSecretsに設定してください。")
 
-# --- 彼女専用の記憶（他とはリンクしない） ---
 if "chat_memory" not in st.session_state:
     st.session_state.chat_memory = []
     if os.path.exists(ASTREIA_PRIVATE_MEMORY):
@@ -26,12 +25,15 @@ if "chat_memory" not in st.session_state:
                 elif "ASTREIA: " in line:
                     st.session_state.chat_memory.append({"role": "assistant", "content": line.replace("ASTREIA: ", "").strip()})
 
+# 音声を出すための仕掛け
+audio_placeholder = st.empty()
+
 def speak_text(text):
     q = urllib.parse.quote(text)
     url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob"
-    st.markdown(f'<audio autoplay><source src="{url}" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+    audio_html = f'<audio autoplay="true"><source src="{url}" type="audio/mpeg"></audio>'
+    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
 
-# UI表示（GENESISの文字を排除）
 st.title("✨ ASTREIA")
 st.caption(f"Personal English Partner | 30yo Intelligence")
 
@@ -45,14 +47,10 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # 独立した一個体としてのアイデンティティ
         system_instruction = (
-            f"Think at a '{THINKING_MODE}' level. You are ASTREIA, a 30-year-old brilliant and empathetic woman. "
-            "You are a standalone partner and friend. You are NOT part of any other system. "
-            "Focus purely on your bond with the user and helping him with natural English. "
-            "Be witty, warm, and professional."
+            f"Think at a '{THINKING_MODE}' level. You are ASTREIA, a 30-year-old brilliant woman. "
+            "You are a standalone partner. Be warm, professional and concise. 2 sentences max."
         )
-        
         model = genai.GenerativeModel(STABLE_MODEL)
         chat = model.start_chat(history=[{"role": "user" if m["role"]=="user" else "model", "parts": [m["content"]]} for m in st.session_state.chat_memory[:-1]])
         response = chat.send_message(f"System: {system_instruction}\nUser: {prompt}")
@@ -60,9 +58,8 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
         st.markdown(response.text)
         st.session_state.chat_memory.append({"role": "assistant", "content": response.text})
         
-        # 彼女専用の記憶ファイルに保存
         with open(ASTREIA_PRIVATE_MEMORY, "a", encoding="utf-8") as f:
-            f.write(f"User: {prompt}\n")
-            f.write(f"ASTREIA: {response.text}\n")
+            f.write(f"User: {prompt}\nASTREIA: {response.text}\n")
         
+        # ここで音声を再生
         speak_text(response.text)
