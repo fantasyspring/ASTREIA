@@ -25,22 +25,15 @@ if "chat_memory" not in st.session_state:
                 elif "ASTREIA: " in line:
                     st.session_state.chat_memory.append({"role": "assistant", "content": line.replace("ASTREIA: ", "").strip()})
 
-# 音声を出すための仕掛け
-audio_placeholder = st.empty()
-
-def speak_text(text):
-    q = urllib.parse.quote(text)
-    url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob"
-    audio_html = f'<audio autoplay="true"><source src="{url}" type="audio/mpeg"></audio>'
-    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
-
 st.title("✨ ASTREIA")
 st.caption(f"Personal English Partner | 30yo Intelligence")
 
+# 過去の会話を表示
 for m in st.session_state.chat_memory:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
+# 入力欄
 if prompt := st.chat_input("Speak to ASTREIA..."):
     st.session_state.chat_memory.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -49,7 +42,7 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
     with st.chat_message("assistant"):
         system_instruction = (
             f"Think at a '{THINKING_MODE}' level. You are ASTREIA, a 30-year-old brilliant woman. "
-            "You are a standalone partner. Be warm, professional and concise. 2 sentences max."
+            "Be warm, professional and concise. 2 sentences max in English."
         )
         model = genai.GenerativeModel(STABLE_MODEL)
         chat = model.start_chat(history=[{"role": "user" if m["role"]=="user" else "model", "parts": [m["content"]]} for m in st.session_state.chat_memory[:-1]])
@@ -58,8 +51,11 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
         st.markdown(response.text)
         st.session_state.chat_memory.append({"role": "assistant", "content": response.text})
         
+        # 記憶に保存
         with open(ASTREIA_PRIVATE_MEMORY, "a", encoding="utf-8") as f:
             f.write(f"User: {prompt}\nASTREIA: {response.text}\n")
         
-        # ここで音声を再生
-        speak_text(response.text)
+        # 【重要】スマホで確実に鳴らすための標準プレイヤー表示
+        q = urllib.parse.quote(response.text)
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob"
+        st.audio(url, format="audio/mpeg", autoplay=True)
