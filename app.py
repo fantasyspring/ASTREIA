@@ -3,18 +3,20 @@ import google.generativeai as genai
 import urllib.parse
 import os
 
-# --- ASTREIA 独立構成 ---
+# --- 構成設定 ---
 STABLE_MODEL = "gemini-2.5-flash"
 THINKING_MODE = "high"
 ASTREIA_PRIVATE_MEMORY = "astreia_memory.txt"
 
 st.set_page_config(page_title="ASTREIA", page_icon="✨")
 
+# API設定
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
     st.error("APIキーをSecretsに設定してください。")
 
+# 記憶の復元
 if "chat_memory" not in st.session_state:
     st.session_state.chat_memory = []
     if os.path.exists(ASTREIA_PRIVATE_MEMORY):
@@ -26,14 +28,13 @@ if "chat_memory" not in st.session_state:
                     st.session_state.chat_memory.append({"role": "assistant", "content": line.replace("ASTREIA: ", "").strip()})
 
 st.title("✨ ASTREIA")
-st.caption(f"Personal English Partner | 30yo Intelligence")
 
-# 過去の会話を表示
+# 過去の会話表示
 for m in st.session_state.chat_memory:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-# 入力欄
+# 入力
 if prompt := st.chat_input("Speak to ASTREIA..."):
     st.session_state.chat_memory.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -41,21 +42,23 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
 
     with st.chat_message("assistant"):
         system_instruction = (
-            f"Think at a '{THINKING_MODE}' level. You are ASTREIA, a 30-year-old brilliant woman. "
-            "Be warm, professional and concise. 2 sentences max in English."
+            f"Level: {THINKING_MODE}. You are ASTREIA, a 30yo empathetic friend. "
+            "Standalone mode. Warm, professional English. Max 2 sentences."
         )
         model = genai.GenerativeModel(STABLE_MODEL)
-        chat = model.start_chat(history=[{"role": "user" if m["role"]=="user" else "model", "parts": [m["content"]]} for m in st.session_state.chat_memory[:-1]])
+        history = [{"role": "user" if m["role"]=="user" else "model", "parts": [m["content"]]} for m in st.session_state.chat_memory[:-1]]
+        chat = model.start_chat(history=history)
         response = chat.send_message(f"System: {system_instruction}\nUser: {prompt}")
         
+        # 1. まずテキストを表示
         st.markdown(response.text)
-        st.session_state.chat_memory.append({"role": "assistant", "content": response.text})
         
-        # 記憶に保存
-        with open(ASTREIA_PRIVATE_MEMORY, "a", encoding="utf-8") as f:
-            f.write(f"User: {prompt}\nASTREIA: {response.text}\n")
-        
-        # 【重要】スマホで確実に鳴らすための標準プレイヤー表示
+        # 2. 次に「音声プレイヤー」を確実に表示
         q = urllib.parse.quote(response.text)
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob"
         st.audio(url, format="audio/mpeg", autoplay=True)
+        
+        # 3. 記憶を更新
+        st.session_state.chat_memory.append({"role": "assistant", "content": response.text})
+        with open(ASTREIA_PRIVATE_MEMORY, "a", encoding="utf-8") as f:
+            f.write(f"User: {prompt}\nASTREIA: {response.text}\n")
