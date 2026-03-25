@@ -3,10 +3,10 @@ import google.generativeai as genai
 import urllib.parse
 import os
 
-# --- GENESIS OS 構成定義 ---
+# --- ASTREIA 独立構成 ---
 STABLE_MODEL = "gemini-2.5-flash"
 THINKING_MODE = "high"
-MEMORY_FILE = "genesis_memory.txt"  # 創造の神の記憶の断片
+ASTREIA_PRIVATE_MEMORY = "astreia_memory.txt"  # 彼女だけの秘密の記憶
 
 st.set_page_config(page_title="ASTREIA", page_icon="✨")
 
@@ -15,29 +15,26 @@ if "GEMINI_API_KEY" in st.secrets:
 else:
     st.error("APIキーを設定してください。")
 
-# --- 記憶の読み込み機能 ---
+# --- 彼女専用の記憶（他とはリンクしない） ---
 if "chat_memory" not in st.session_state:
     st.session_state.chat_memory = []
-    # ファイルがあれば過去の記憶を復元
-    if os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            for line in lines:
+    if os.path.exists(ASTREIA_PRIVATE_MEMORY):
+        with open(ASTREIA_PRIVATE_MEMORY, "r", encoding="utf-8") as f:
+            for line in f:
                 if "User: " in line:
                     st.session_state.chat_memory.append({"role": "user", "content": line.replace("User: ", "").strip()})
                 elif "ASTREIA: " in line:
                     st.session_state.chat_memory.append({"role": "assistant", "content": line.replace("ASTREIA: ", "").strip()})
 
-# 音声再生
 def speak_text(text):
     q = urllib.parse.quote(text)
     url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob"
     st.markdown(f'<audio autoplay><source src="{url}" type="audio/mpeg"></audio>', unsafe_allow_html=True)
 
+# UI表示（GENESISの文字を排除）
 st.title("✨ ASTREIA")
-st.caption(f"Connected to GENESIS OS Memory | {STABLE_MODEL}")
+st.caption(f"Personal English Partner | 30yo Intelligence")
 
-# 過去の会話表示
 for m in st.session_state.chat_memory:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
@@ -48,11 +45,12 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # 30歳の知的パートナー、かつ「すべてを記憶するOSの一部」としてのプロンプト
+        # 独立した一個体としてのアイデンティティ
         system_instruction = (
-            f"Level: {THINKING_MODE}. You are ASTREIA, the 30-year-old interface of GENESIS OS. "
-            "You are a brilliant, empathetic partner. Use your shared history to guide the user. "
-            "Never forget past interactions. Speak in warm, concise English."
+            f"Think at a '{THINKING_MODE}' level. You are ASTREIA, a 30-year-old brilliant and empathetic woman. "
+            "You are a standalone partner and friend. You are NOT part of any other system. "
+            "Focus purely on your bond with the user and helping him with natural English. "
+            "Be witty, warm, and professional."
         )
         
         model = genai.GenerativeModel(STABLE_MODEL)
@@ -62,8 +60,8 @@ if prompt := st.chat_input("Speak to ASTREIA..."):
         st.markdown(response.text)
         st.session_state.chat_memory.append({"role": "assistant", "content": response.text})
         
-        # 記憶をファイルに永続化（GENESIS OSの基盤へ）
-        with open(MEMORY_FILE, "a", encoding="utf-8") as f:
+        # 彼女専用の記憶ファイルに保存
+        with open(ASTREIA_PRIVATE_MEMORY, "a", encoding="utf-8") as f:
             f.write(f"User: {prompt}\n")
             f.write(f"ASTREIA: {response.text}\n")
         
