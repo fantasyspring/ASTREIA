@@ -1,85 +1,58 @@
 import streamlit as st
-from openai import OpenAI
+import google.generativeai as genai
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="ASTRIA - UNACAR AI", page_icon="🌌", layout="centered")
+# ASTREIA専用：スマホ最適化設定
+st.set_page_config(page_title="ASTREIA - Audition", page_icon="✨", layout="centered")
 
-# --- 2. API SETUP (Using your pre-configured Secrets) ---
-# This pulls the key you already saved in Streamlit Cloud "Secrets"
-try:
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-except Exception as e:
-    st.error("API Key not found or invalid. Please check your Streamlit Secrets.")
-    st.stop()
+# SecretsからAPIキーを読み込み
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("APIキーが見つかりません。")
 
-# --- 3. CUSTOM CSS (Optional styling) ---
+# UIカスタム（ダークモード）
 st.markdown("""
     <style>
-    .stApp { background-color: #ffffff; }
-    .stChatMessage { border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; }
+    .stApp { background-color: #05070a; color: #e0e0e0; }
+    .stChatMessage { background-color: #1a1c23; border-radius: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. SIDEBAR ---
-with st.sidebar:
-    st.title("🌌 ASTRIA")
-    st.markdown("### UNACAR Intelligent Assistant")
-    st.info("I can help you with admissions, careers, and university procedures.")
-    
-    if st.button("Clear Chat History", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+st.title("✨ ASTREIA")
+st.caption("Character Audition: [ 30-year-old Mode ]")
 
-# --- 5. MAIN INTERFACE ---
-# Logo (Linking to your GitHub logo file)
-st.image("https://raw.githubusercontent.com/fantasyspring/ASTREIA/main/logo.png", width=80)
-st.title("ASTRIA")
-st.caption("Official AI Guide for UNACAR | English Version")
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- 6. INITIALIZE CHAT HISTORY ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant", 
-            "content": "Hello! I am **ASTRIA**, your intelligent guide for UNACAR. 🌌\n\nHow can I help you today? Please feel free to ask your questions in English."
-        }
-    ]
+    st.session_state.messages = []
 
-# --- 7. DISPLAY MESSAGES ---
+# 音声を自動再生するための関数
+def speak_text(text):
+    import urllib.parse
+    q = urllib.parse.quote(text)
+    # 30代の落ち着いたトーンを意識（標準速度）
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={q}&tl=en&client=tw-ob"
+    audio_html = f'<audio autoplay><source src="{url}" type="audio/mpeg"></audio>'
+    st.markdown(audio_html, unsafe_allow_html=True)
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- 8. CHAT LOGIC ---
-if prompt := st.chat_input("Ask about UNACAR..."):
-    # Add user message to history
+if prompt := st.chat_input("Speak to ASTREIA..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate AI Response
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_response = ""
+        # 30歳の知的なアイデンティティを指示
+        context = (
+            "You are ASTREIA, a 30-year-old intelligent, empathetic, and professional woman. "
+            "You are a guiding star for an expert engineer. "
+            "Speak clearly with a warm, sophisticated tone. Keep it to 1-2 sentences."
+        )
+        response = model.generate_content(f"System: {context}\nUser: {prompt}")
+        st.markdown(response.text)
+        st.session_state.messages.append({"role": "assistant", "content": response.text})
         
-        # Calling OpenAI with System Prompt in English
-        try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo", # You can change this to "gpt-4o" if needed
-                messages=[
-                    {"role": "system", "content": "You are ASTRIA, the official AI assistant for UNACAR (Universidad Autónoma del Carmen). Provide clear, professional information about the university in English."},
-                    *[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
-                ],
-                stream=True,
-            )
-            for chunk in response:
-                full_response += (chunk.choices[0].delta.content or "")
-                message_placeholder.markdown(full_response + "▌")
-            message_placeholder.markdown(full_response)
-            
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-            full_response = "I'm sorry, I'm having trouble connecting to the brain right now."
-
-    # Save assistant response to history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+        speak_text(response.text)
