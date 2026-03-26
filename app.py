@@ -15,12 +15,13 @@ HIGH_SPEC_MODEL = "gemini-3.1-pro-preview"
 THINKING_MODE = "high"
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# --- ユーザー設定 ---
-USER_PROFILE = {
-    "name": "David",
-    "style": "Professional, logical, conclusion-first",
-    "interests": "Semiconductor technology, Science, Education",
-}
+# --- アプリ本体に蓄積する「学習済みデータ」 ---
+# ここに必要なことを書き込んでおけば、ASTREIAは履歴がなくても「わかっている」状態になります
+USER_LEARNING_DATA = """
+- David is a senior engineer (25+ years) in lithography.
+- Prefers logic-first, high-spec discussion.
+- Focus: Building GENESIS OS.
+"""
 
 st.set_page_config(page_title="ASTREIA GENESIS-V1", page_icon="✨")
 
@@ -28,31 +29,27 @@ st.set_page_config(page_title="ASTREIA GENESIS-V1", page_icon="✨")
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    st.error("ERROR: GEMINI_API_KEY is missing.")
+    # ローカル実行時は環境変数や直接入力でも対応可能に
+    api_key = st.sidebar.text_input("API Key", type="password")
+    if api_key:
+        genai.configure(api_key=api_key)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 音声生成・再生関数（ここが復活しました）
 def play_audio(text):
-    # テキストから音声ファイルを生成
     tts = gTTS(text=text, lang='en', tld='com')
     fp = io.BytesIO()
     tts.write_to_fp(fp)
     b64 = base64.b64encode(fp.getvalue()).decode()
-    # HTMLタグを使用して自動再生
-    md = f"""
-        <audio autoplay="true">
-        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        </audio>
-    """
+    md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
     st.markdown(md, unsafe_allow_html=True)
 
 # --- UI構築 ---
-st.title("✨ ASTREIA (GENESIS OS Inside)")
-st.caption(f"Project: {PROJECT_ID} | Active Models: {STABLE_MODEL} & {HIGH_SPEC_MODEL}")
+st.title("✨ ASTREIA (GENESIS OS Prototype)")
+st.caption(f"Project: {PROJECT_ID} | Running on: {HIGH_SPEC_MODEL}")
 
-# 履歴表示
+# 表示用の履歴（APIには投げない）
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -62,44 +59,38 @@ input_col, mic_col = st.columns([0.85, 0.15])
 
 with input_col:
     text_input = st.chat_input("Type or Speak...")
-
 with mic_col:
     audio_data = mic_recorder(start_prompt="🎙️", stop_prompt="🛑", key='recorder')
 
 user_content = None
 
-# 1. 音声認識（STT）
+# STT（gemini-2.5-flash）
 if text_input:
     user_content = text_input
 elif audio_data:
-    with st.spinner("Processing Voice..."):
-        model_stt = genai.GenerativeModel(STABLE_MODEL)
-        audio_blob = {'mime_type': 'audio/wav', 'data': audio_data['bytes']}
-        stt_res = model_stt.generate_content(["Transcribe accurately.", audio_blob])
-        user_content = stt_res.text
+    model_stt = genai.GenerativeModel(STABLE_MODEL)
+    audio_blob = {'mime_type': 'audio/wav', 'data': audio_data['bytes']}
+    stt_res = model_stt.generate_content(["Transcribe accurately.", audio_blob])
+    user_content = stt_res.text
 
-# 2. メイン思考 ＆ 音声出力
+# 応答処理（gemini-3.1-pro-preview）
 if user_content:
     st.session_state.messages.append({"role": "user", "content": user_content})
     with st.chat_message("user"):
         st.markdown(user_content)
 
     with st.chat_message("assistant"):
+        # 履歴を送る代わりに、学習済みデータ(USER_LEARNING_DATA)をシステム指示に含める
         system_instruction = (
-            f"You are ASTREIA. Partner: {USER_PROFILE['name']}. Style: {USER_PROFILE['style']}. "
-            f"Mode: {THINKING_MODE}. Reply in 2-3 natural sentences. "
-            "If his English has errors, suggest a fix in ()."
+            f"You are ASTREIA. User Profile: {USER_LEARNING_DATA}. "
+            f"Mode: {THINKING_MODE}. Reply in 2 sentences. Focus on high-level English. "
+            "No full history provided, so focus ONLY on the current input."
         )
         
         model = genai.GenerativeModel(HIGH_SPEC_MODEL)
-        history = [{"role": "user" if m["role"]=="user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]]
-        chat = model.start_chat(history=history)
+        # 履歴を送らず、単発のリクエストとして送信（クォータ節約）
+        response = model.generate_content(f"System: {system_instruction}\nUser: {user_content}")
         
-        response = chat.send_message(f"System: {system_instruction}\nUser: {user_content}")
-        
-        # テキスト表示
         st.markdown(response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
-        
-        # 【重要】音声を自動再生
         play_audio(response.text)
