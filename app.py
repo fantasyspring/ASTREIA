@@ -15,24 +15,21 @@ HIGH_SPEC_MODEL = "gemini-3.1-pro-preview"
 THINKING_MODE = "high"
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# --- アプリ本体に蓄積する「学習済みデータ」 ---
-# ここに必要なことを書き込んでおけば、ASTREIAは履歴がなくても「わかっている」状態になります
-USER_LEARNING_DATA = """
-- David is a senior engineer (25+ years) in lithography.
-- Prefers logic-first, high-spec discussion.
-- Focus: Building GENESIS OS.
+# --- 教育的コンテキスト（本体蓄積用） ---
+CONTEXT = """
+- User: David, Senior Engineer (25+ yrs).
+- Field: Semiconductor/Liquid Crystal Lithography.
+- Goal: Build GENESIS OS / Professional English Training.
 """
 
-st.set_page_config(page_title="ASTREIA GENESIS-V1", page_icon="✨")
+st.set_page_config(page_title="ASTREIA High-Speed", page_icon="⚡")
 
 # API設定
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
 else:
-    # ローカル実行時は環境変数や直接入力でも対応可能に
-    api_key = st.sidebar.text_input("API Key", type="password")
-    if api_key:
-        genai.configure(api_key=api_key)
+    st.error("API Key not found.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -45,11 +42,11 @@ def play_audio(text):
     md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
     st.markdown(md, unsafe_allow_html=True)
 
-# --- UI構築 ---
-st.title("✨ ASTREIA (GENESIS OS Prototype)")
-st.caption(f"Project: {PROJECT_ID} | Running on: {HIGH_SPEC_MODEL}")
+# --- UI ---
+st.title("⚡ ASTREIA (Flash Mode)")
+st.caption(f"Using {STABLE_MODEL} for high stability and speed.")
 
-# 表示用の履歴（APIには投げない）
+# 表示用の履歴（メモリ節約のためAPIには直近のみ送信）
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -58,37 +55,38 @@ st.divider()
 input_col, mic_col = st.columns([0.85, 0.15])
 
 with input_col:
-    text_input = st.chat_input("Type or Speak...")
+    text_input = st.chat_input("Input here...")
 with mic_col:
     audio_data = mic_recorder(start_prompt="🎙️", stop_prompt="🛑", key='recorder')
 
 user_content = None
 
-# STT（gemini-2.5-flash）
+# 1. 音声認識（STT）- 2.5-flash
 if text_input:
     user_content = text_input
 elif audio_data:
-    model_stt = genai.GenerativeModel(STABLE_MODEL)
-    audio_blob = {'mime_type': 'audio/wav', 'data': audio_data['bytes']}
-    stt_res = model_stt.generate_content(["Transcribe accurately.", audio_blob])
-    user_content = stt_res.text
+    with st.spinner("Listening..."):
+        model_stt = genai.GenerativeModel(STABLE_MODEL)
+        audio_blob = {'mime_type': 'audio/wav', 'data': audio_data['bytes']}
+        stt_res = model_stt.generate_content(["Transcribe.", audio_blob])
+        user_content = stt_res.text
 
-# 応答処理（gemini-3.1-pro-preview）
+# 2. 思考・回答生成（LLM）- 2.5-flash に一本化してエラー回避
 if user_content:
     st.session_state.messages.append({"role": "user", "content": user_content})
     with st.chat_message("user"):
         st.markdown(user_content)
 
     with st.chat_message("assistant"):
-        # 履歴を送る代わりに、学習済みデータ(USER_LEARNING_DATA)をシステム指示に含める
         system_instruction = (
-            f"You are ASTREIA. User Profile: {USER_LEARNING_DATA}. "
-            f"Mode: {THINKING_MODE}. Reply in 2 sentences. Focus on high-level English. "
-            "No full history provided, so focus ONLY on the current input."
+            f"You are ASTREIA. Context: {CONTEXT} Mode: {THINKING_MODE}. "
+            "Reply in 2 natural sentences. Direct professional correction in () if required."
         )
         
-        model = genai.GenerativeModel(HIGH_SPEC_MODEL)
-        # 履歴を送らず、単発のリクエストとして送信（クォータ節約）
+        # クォータの緩い 2.5-flash をメイン思考に使用
+        model = genai.GenerativeModel(STABLE_MODEL)
+        
+        # 履歴を送らず単発処理にすることでトークンとリソースを節約
         response = model.generate_content(f"System: {system_instruction}\nUser: {user_content}")
         
         st.markdown(response.text)
