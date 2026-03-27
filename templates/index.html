@@ -5,16 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ASTREIA</title>
     
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='avatar.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='avatar_icon.png') }}">
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#ff69b4">
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ASTREIA">
+    <meta name="theme-color" content="#ff69b4">
 
     <style>
         body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fce4ec; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         .avatar-container { flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
-        .avatar-container img { height: 100%; width: 100%; object-fit: cover; }
+        /* チャット画面の画像は縦長の avatar.png をきれいに表示 */
+        .avatar-container img { height: 100%; width: 100%; object-fit: cover; object-position: center; }
         .chat-container { height: 40%; background: white; border-radius: 20px 20px 0 0; padding: 20px; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         .message-area { flex: 1; overflow-y: auto; margin-bottom: 10px; font-size: 16px; line-height: 1.5; color: #333; }
         .input-area { display: flex; gap: 10px; align-items: center; }
