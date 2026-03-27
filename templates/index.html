@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASTREIA</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .app-container { width: 375px; height: 667px; background: white; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* アバターセクションの復活 */
+        .avatar-section { flex: 1; background: url('/static/avatar.png') center/cover no-repeat; background-color: #ffe4e1; position: relative; }
+        .chat-overlay { position: absolute; bottom: 0; width: 100%; background: rgba(255,255,255,0.95); padding: 20px; box-sizing: border-box; border-top: 2px solid #ff69b4; min-height: 120px; }
+        .speech-bubble { font-size: 16px; font-weight: bold; color: #333; line-height: 1.5; }
+
+        /* 入力エリアの調整 */
+        .input-area { padding: 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #eee; background: white; }
+        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; outline: none; }
+        
+        /* ボタンのデザイン */
+        button { background: #ff69b4; color: white; border: none; padding: 10px 15px; border-radius: 25px; cursor: pointer; transition: 0.3s; }
+        #mic-btn { 
+            background: #ff69b4; border-radius: 50%; width: 45px; height: 45px; 
+            font-size: 20px; display: flex; align-items: center; justify-content: center;
+        }
+        #mic-btn.recording { background: red; transform: scale(1.1); box-shadow: 0 0 10px red; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="avatar-section">
+        <div class="chat-overlay">
+            <div id="speech" class="speech-bubble">"Tap the mic and say Hi!"</div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <button id="mic-btn" title="Hold to Speak">🎤</button>
+        <input type="text" id="userInput" placeholder="Talk to Astreia..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <button id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const speech = document.getElementById('speech');
+    const input = document.getElementById('userInput');
+    const micBtn = document.getElementById('mic-btn');
+
+    // --- 音声合成 (ASTREIAの声) ---
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        // 絵文字を除去して読み上げ
+        const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+        const uttr = new SpeechSynthesisUtterance(cleanText);
+        uttr.lang = 'en-US'; 
+        uttr.rate = 1.2; 
+        uttr.pitch = 1.3;
+        
+        // 女性らしい声を選択
+        const voices = window.speechSynthesis.getVoices();
+        const v = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
+        if (v) uttr.voice = v;
+        
+        window.speechSynthesis.speak(uttr);
+    }
+
+    // --- 音声認識 (Masterの耳) ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        // マイクボタンを押しっぱなしで録音
+        micBtn.addEventListener('mousedown', () => {
+            recognition.start();
+            micBtn.classList.add('recording');
+        });
+
+        micBtn.addEventListener('mouseup', () => {
+            recognition.stop();
+            micBtn.classList.remove('recording');
+        });
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            input.value = transcript;
+        };
+    } else {
+        micBtn.style.display = 'none';
+    }
+
+    // --- メッセージ送信 ---
+    async function sendMessage() {
+        const msg = input.value; 
+        if (!msg) return;
+
+        speech.innerText = "Thinking..."; 
+        input.value = '';
+
+        try {
+            const res = await fetch('/chat', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({message: msg}) 
+            });
+            const data = await res.json();
+            
+            speech.innerText = data.response;
+            speak(data.response);
+        } catch (e) { 
+            speech.innerText = "Error!"; 
+        }
+    }
+
+    // 初回クリック時の音声制限解除
+    document.body.onclick = () => { window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); };
+</script>
+</body>
+</html>
