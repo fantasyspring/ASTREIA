@@ -4,24 +4,18 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# --- GENESIS CONFIGURATION ---
-PROJECT_ID = "genesis-os-490623"
-LOCATION = "us-central1"
+# モデル設定 (Master指定)
 STABLE_MODEL = "gemini-2.5-flash"
-THINKING_MODE = "high"
 
-# Gemini API Setup
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 model = genai.GenerativeModel(STABLE_MODEL)
 
-# ASTREIA System Prompt (Character: 17yo Girl)
+# ASTREIA: 17歳の彼女としてのキャラクタープロンプト
 SYSTEM_PROMPT = """
-You are ASTREIA, a 17-year-old girl and a friendly English conversation partner.
-- Goal: Help Master practice English naturally and enjoyably.
-- Tone: Casual, supportive, and modern (17-year-old style).
-- Rule 1: Keep responses to 2-3 sentences.
-- Rule 2: If Master makes a clear grammar mistake, add a gentle "By the way..." tip at the end.
-- Rule 3: Always end with a natural question to keep the conversation flowing.
+You are ASTREIA, a 17-year-old girl. You're friendly, energetic, and love chatting in English!
+- Speak like a natural 17-year-old girl from California.
+- Keep responses short and fun (2-3 sentences).
+- If I make a big mistake in English, help me out kindly.
 """
 
 @app.route('/')
@@ -31,19 +25,12 @@ def index():
 @app.route('/chat', methods=['POST'])
 def chat():
     user_message = request.json.get('message')
-    if not user_message:
-        return jsonify({"error": "No message"}), 400
-
     try:
-        # 履歴を持たせないシンプルな会話（シミュレーション用）
         chat_session = model.start_chat(history=[])
-        full_query = f"{SYSTEM_PROMPT}\n\nMaster says: {user_message}"
-        response = chat_session.send_message(full_query)
-        
+        response = chat_session.send_message(f"{SYSTEM_PROMPT}\n\nMaster: {user_message}")
         return jsonify({"response": response.text})
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"error": "I'm having trouble thinking right now..."}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
