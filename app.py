@@ -1,120 +1,152 @@
 import os
-from flask import Flask, render_template, request, jsonify
+import json
+import datetime
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import google.generativeai as genai
+from dotenv import load_dotenv
 
+# --- 初期設定 ---
+load_dotenv()
 app = Flask(__name__)
 
 # --- GENESIS 2026 鉄壁の設定 ---
-PROJECT_ID = "genesis-os-490623"
-LOCATION = "us-central1"
-
-# モデルの優先順位
-MODELS_TO_TRY = [
-    "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-live-preview",
-    "gemini-2.5-flash"
-]
-
-# APIキー設定
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# 最適なモデルの自動接続
-model = None
-selected_model_name = ""
+USER_DATA_FILE = 'user_data.json'
 
-for model_name in MODELS_TO_TRY:
+# 利用可能な最高のモデルを自動選択
+MODELS_TO_TRY = ["gemini-3.1-pro-preview", "gemini-3.1-flash-live-preview", "gemini-2.5-flash"]
+model = None
+for m_name in MODELS_TO_TRY:
     try:
-        test_model = genai.GenerativeModel(model_name)
+        test_model = genai.GenerativeModel(m_name)
         test_model.generate_content("test", generation_config={"max_output_tokens": 1})
         model = test_model
-        selected_model_name = model_name
-        print(f"GENESIS System: Connected to [{selected_model_name}]")
+        print(f"GENESIS: Connected to [{m_name}]")
         break
-    except Exception:
-        print(f"GENESIS System: [{model_name}] unavailable. Trying next...")
-
+    except: continue
 if not model:
-    selected_model_name = "gemini-2.5-flash"
-    model = genai.GenerativeModel(selected_model_name)
-    print(f"GENESIS System: Fallback to [{selected_model_name}]")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
-# ==========================================
-# --- ASTREIA AGING & IMAGE SETTINGS ---
-# 現在は "17" で完成させます。将来ここを "30" や "50" に変えるだけで
-# プロンプトと画像パスが連動します。
-# ==========================================
-USER_SET_AGE = "17" 
+# --- ユーザーデータ管理ロジック ---
+def load_user_data():
+    if os.path.exists(USER_DATA_FILE):
+        try:
+            with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except: return None
+    return None
 
+def save_user_data(data):
+    with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# --- ペルソナ設定 ---
 PERSONA_CATALOG = {
-    "17": {
-        "image": "avatar.png", # 17歳メイン画像
-        "role_desc": "a 17-year-old high school student and the user's close friend.",
-        "tone": "Energetic, casual, and supportive. Use Gen-Z slang like 'totally' or 'super.'",
-        "topics": "school, SNS, hobbies, and dreams."
-    },
-    "30": {
-        "image": "avatar_30.png",
-        "role_desc": "a 30-year-old professional and sophisticated friend.",
-        "tone": "Natural, empathetic, and professional yet friendly.",
-        "topics": "career, travel, and lifestyle."
-    },
-    "50": {
-        "image": "avatar_50.png",
-        "role_desc": "a 50-year-old wise mentor and warm friend.",
-        "tone": "Calm, thoughtful, and encouraging with a rich vocabulary.",
-        "topics": "life philosophy, health, and goals."
-    }
+    "17": {"image": "avatar.png", "desc": "a 17-year-old high school student. Energetic Gen-Z friend."},
+    "30": {"image": "avatar_30.png", "desc": "a 30-year-old professional. Sophisticated peer."},
+    "50": {"image": "avatar_50.png", "desc": "a 50-year-old wise mentor. Warm and experienced friend."}
 }
 
-selected = PERSONA_CATALOG.get(USER_SET_AGE, PERSONA_CATALOG["17"])
-
-# システムプロンプトの構築
-SYSTEM_PROMPT = f"""
-Role: You are ASTREIA, {selected['role_desc']} living in Santa Monica.
-Tone/Personality: {selected['tone']}
-Key Topics: {selected['topics']}
-
-Instructions:
-1. ALWAYS respond in English. 
-2. Be a 'friend', not a 'teacher'.
-3. Keep responses brief (1-2 sentences) and engaging.
-4. If the user makes a clear mistake, add a natural suggestion at the very end.
-5. Ask a question to keep the friendship growing!
-"""
-# ==========================================
-
+# --- ルート設定 ---
 @app.route('/')
 def index():
-    # 選択された年齢に応じた画像パスをテンプレートに渡す準備
-    return render_template('index.html', avatar_image=selected['image'])
+    user_data = load_user_data()
+    # ユーザーデータがなければ初期設定（初回起動）
+    first_launch = True if user_data is None else False
+    
+    can_change = True
+    avatar_img = "avatar.png"
+    
+    if user_data:
+        # 10日間のカウントダウン
+        install_date = datetime.datetime.fromisoformat(user_data['install_date'])
+        days_passed = (datetime.datetime.now() - install_date).days
+        if days_passed > 10:
+            can_change = False
+        # 現在のアバター画像を取得
+        age = user_data.get('selected_age', '17')
+        avatar_img = PERSONA_CATALOG.get(age, PERSONA_CATALOG["17"])["image"]
+            
+    return render_template('index.html', 
+                           first_launch=first_launch, 
+                           user_data=user_data,
+                           can_change=can_change,
+                           avatar_image=avatar_img)
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+@app.route('/setup', methods=['POST'])
+def setup():
+    setup_data = request.json
+    new_data = {
+        "user_name": setup_data.get("name", "Friend"),
+        "selected_age": setup_data.get("age", "17"),
+        "install_date": datetime.datetime.now().isoformat(),
+        "memory": [], # 会話から得たユーザーの好みを保存
+        "chat_history": [] # 会話の流れを保持
+    }
+    save_user_data(new_data)
+    return jsonify({"status": "success"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
+    user_data = load_user_data()
+    if not user_data:
+        return jsonify({"response": "Please complete the setup first!"})
+
+    user_input = request.json.get('message', '')
+    age = user_data.get('selected_age', '17')
+    persona = PERSONA_CATALOG.get(age, PERSONA_CATALOG["17"])
+
+    # --- ASTREIA 統合思考回路 ---
+    system_prompt = f"""
+    You are ASTREIA, {persona['desc']} in Santa Monica.
+    You are the best friend of {user_data['user_name']}.
+
+    [FRIENDSHIP MEMORY]
+    Your knowledge of this friend: {user_data['memory']}
+
+    [CORE RULE: LANGUAGE MENTOR MODE]
+    - If the user asks for a better/natural way to say something, start with "Sure! You can say it like this:"
+    - Otherwise, keep responses brief (under 20 words) and casual.
+    - Reference their memory naturally to show you care.
+
+    [VOICE & STYLE]
+    - Speak like a real-time chat. Use "Oh my gosh" instead of "OMG".
+    - If you learn a new fact about the user (e.g., their hobby), start that sentence with [MEM].
+    """
+
+    # 履歴の構築（最新10件）
+    messages = [{"role": "user", "parts": [system_prompt]}]
+    for msg in user_data['chat_history'][-10:]:
+        messages.append(msg)
+    messages.append({"role": "user", "parts": [user_input]})
+
     try:
-        user_message = request.json.get('message')
-        if not user_message:
-            return jsonify({"response": "I'm listening! What's on your mind?"})
+        response = model.generate_content(messages)
+        ai_response = response.text
 
-        generation_config = {
-            "max_output_tokens": 120,
-            "temperature": 0.8,
-        }
+        # 記憶の自動保存
+        if "[MEM]" in ai_response:
+            new_info = ai_response.split("[MEM]")[1].split(".")[0].strip()
+            if new_info not in user_data['memory']:
+                user_data['memory'].append(new_info)
+            ai_response = ai_response.replace(f"[MEM]{new_info}", "").strip()
 
-        response = model.generate_content(
-            f"{SYSTEM_PROMPT}\n\nUser: {user_message}\nASTREIA:",
-            generation_config=generation_config
-        )
-        
-        if response.text:
-            return jsonify({"response": response.text})
-        else:
-            raise Exception("No text in response")
-    
+        # 履歴を更新して保存
+        user_data['chat_history'].append({"role": "user", "parts": [user_input]})
+        user_data['chat_history'].append({"role": "model", "parts": [ai_response]})
+        if len(user_data['chat_history']) > 20: user_data['chat_history'] = user_data['chat_history'][-20:]
+        save_user_data(user_data)
+
+        return jsonify({'response': ai_response})
     except Exception as e:
-        print(f"GENESIS Chat Error: {e}")
-        return jsonify({"response": "Signal is weak! Let's try again, my friend!"})
+        print(f"Chat Error: {e}")
+        return jsonify({'response': "Sorry, my signal is weak! Can you say that again?"})
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
