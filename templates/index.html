@@ -13,10 +13,9 @@
     <meta name="theme-color" content="#ff69b4">
 
     <style>
-        /* 全体の背景：サンタモニカの夕暮れをイメージしたグラデーション */
         body { 
             margin: 0; 
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
             background: linear-gradient(135deg, #fce4ec 0%, #ffe0b2 100%); 
             display: flex; 
             justify-content: center; 
@@ -25,104 +24,109 @@
             overflow: hidden; 
         }
 
-        /* アプリ本体のコンテナ（PCではスマホサイズ、スマホでは全画面） */
         .app-container {
             width: 100%;
-            max-width: 450px; /* PCでの最大幅 */
+            max-width: 450px;
             height: 100%;
-            max-height: 900px; /* PCでの最大高さ */
             background: white;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
             position: relative;
-            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
         }
 
-        /* PCのみ角丸を適用 */
         @media (min-width: 500px) {
-            .app-container {
-                border-radius: 30px;
-                height: 90vh;
-            }
+            .app-container { border-radius: 30px; height: 90vh; }
         }
 
-        /* 画像エリア */
         .avatar-container { 
             flex: 1; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
             overflow: hidden; 
             background: #000;
+            display: flex;
+            justify-content: center;
         }
         .avatar-container img { 
             height: 100%; 
             width: 100%; 
             object-fit: cover; 
-            object-position: center; 
         }
 
-        /* チャットエリア */
         .chat-container { 
-            height: 35%; 
-            background: rgba(255, 255, 255, 0.95); 
-            backdrop-filter: blur(10px);
+            height: 38%; 
+            background: white; 
             padding: 20px; 
             display: flex; 
             flex-direction: column; 
-            border-top: 1px solid rgba(0,0,0,0.05);
+            box-sizing: border-box;
         }
         .message-area { 
             flex: 1; 
             overflow-y: auto; 
             margin-bottom: 15px; 
-            font-size: 17px; 
-            line-height: 1.5; 
+            font-size: 18px; 
+            line-height: 1.4; 
             color: #444; 
-            font-weight: 500;
             text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        
         .input-area { 
             display: flex; 
-            gap: 12px; 
+            gap: 10px; 
             align-items: center; 
+            height: 50px; /* 入力エリアの高さを固定 */
         }
-        input { 
-            flex: 1; 
-            padding: 12px 18px; 
-            border: 1px solid #eee; 
-            border-radius: 25px; 
-            outline: none; 
-            font-size: 16px; 
-            background: #f8f8f8;
-        }
+
+        /* マイクボタンを「正円」に固定する魔法の設定 */
         .mic-button { 
             background: #f06292; 
-            width: 50px; 
-            height: 50px; 
-            border-radius: 50%; 
+            width: 50px;      /* 横幅固定 */
+            height: 50px;     /* 縦幅固定 */
+            min-width: 50px;  /* 潰れ防止 */
+            min-height: 50px; /* 伸び防止 */
+            border-radius: 50%; /* 正円に */
             display: flex; 
             justify-content: center; 
             align-items: center; 
             cursor: pointer; 
             font-size: 24px; 
-            transition: all 0.3s;
             box-shadow: 0 4px 10px rgba(240, 98, 146, 0.3);
+            border: none;
+            padding: 0;
+            flex-shrink: 0;   /* 他の要素に押されても形を保つ */
         }
+
         .mic-active { 
             background: #ff1744; 
             transform: scale(1.1); 
             box-shadow: 0 0 20px rgba(255, 23, 68, 0.5); 
         }
+
+        input { 
+            flex: 1; 
+            height: 45px;
+            padding: 0 15px; 
+            border: 1px solid #eee; 
+            border-radius: 25px; 
+            outline: none; 
+            font-size: 16px; 
+            background: #f8f8f8;
+            box-sizing: border-box;
+        }
+
         .send-btn {
             background: #ff69b4;
             color: white;
             border: none;
-            padding: 12px 20px;
+            height: 45px;
+            padding: 0 20px;
             border-radius: 25px;
             font-weight: bold;
             cursor: pointer;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -136,7 +140,7 @@
     <div class="chat-container">
         <div class="message-area" id="chat-box">"Tap the mic and say Hi!"</div>
         <div class="input-area">
-            <div class="mic-button" id="mic-btn">🎤</div>
+            <button class="mic-button" id="mic-btn">🎤</button>
             <input type="text" id="user-input" placeholder="Message...">
             <button class="send-btn" onclick="sendMessage()">Send</button>
         </div>
@@ -148,7 +152,6 @@
     const userInput = document.getElementById('user-input');
     const micBtn = document.getElementById('mic-btn');
 
-    // 音声読み上げ
     function speak(text) {
         window.speechSynthesis.cancel();
         const uttr = new SpeechSynthesisUtterance(text);
@@ -157,7 +160,6 @@
         window.speechSynthesis.speak(uttr);
     }
 
-    // 音声認識
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'en-US';
     recognition.interimResults = false;
@@ -180,14 +182,11 @@
         chatBox.innerText = "Try again...";
     };
 
-    // メッセージ送信
     async function sendMessage() {
         const text = userInput.value;
         if (!text) return;
-
         userInput.value = '';
         chatBox.innerText = "Thinking...";
-
         try {
             const response = await fetch('/chat', {
                 method: 'POST',
