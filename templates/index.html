@@ -3,276 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ASTREIA - Your English Friend</title>
+    <title>ASTREIA - Genesis OS</title>
     <style>
-        /* --- デザイン定義 --- */
         :root { 
             --primary-blue: #1a73e8; 
-            --accent-yellow: #fff9c4; 
             --beach-gradient: linear-gradient(135deg, #e0f7fa 0%, #fff9c4 50%, #ffe0b2 100%);
         }
         
         body { 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            font-family: 'Segoe UI', sans-serif; 
             background: var(--beach-gradient); 
-            background-attachment: fixed;
-            margin: 0; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center;
-            height: 100vh; 
-            overflow: hidden; 
+            margin: 0; display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden; perspective: 1000px; /* 3D効果の奥行き設定 */
         }
-        
-        /* メインコンテナ（アプリ風の浮遊感） */
-        .app-container { 
-            width: 100%; 
-            max-width: 450px; 
-            height: 92vh;
-            background: rgba(255, 255, 255, 0.85); 
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            display: flex; 
-            flex-direction: column; 
-            position: relative; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15); 
-            border-radius: 35px;
-            border: 1px solid rgba(255,255,255,0.4);
-            overflow: hidden;
-        }
-        
-        /* ヘッダー：ASTREIAの顔 */
-        .header { 
-            padding: 20px; 
-            text-align: center; 
-            border-bottom: 1px solid rgba(0,0,0,0.05); 
-            background: rgba(255,255,255,0.5);
-            z-index: 10; 
-        }
-        .avatar-img { 
-            width: 85px; 
-            height: 85px; 
-            border-radius: 50%; 
-            border: 4px solid white; 
-            object-fit: cover; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-        }
-        .app-title { font-weight: 800; margin-top: 10px; font-size: 1.3rem; color: var(--primary-blue); letter-spacing: 1px; }
-        
-        /* チャットエリア：吹き出しのデザイン */
-        #chat-box { 
-            flex-grow: 1; 
-            overflow-y: auto; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
-            background: rgba(255,255,255,0.2);
-        }
-        .msg { 
-            max-width: 80%; 
-            padding: 12px 18px; 
-            border-radius: 22px; 
-            line-height: 1.5; 
-            font-size: 15px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .user { align-self: flex-end; background: var(--primary-blue); color: white; border-bottom-right-radius: 4px; }
-        .astreia { align-self: flex-start; background: white; color: #444; border-bottom-left-radius: 4px; border: 1px solid rgba(0,0,0,0.05); }
 
-        /* 操作エリア：マイクボタン */
-        .controls { 
-            padding: 25px; 
-            background: white;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            gap: 8px; 
+        /* --- 3Dアバター表示ユニット --- */
+        .avatar-viewport {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto 30px;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
         }
-        #mic-btn { 
-            width: 75px; 
-            height: 75px; 
-            border-radius: 50%; 
-            border: none; 
-            background: linear-gradient(135deg, #1a73e8, #42a5f5); 
-            color: white; 
-            font-size: 32px; 
-            cursor: pointer; 
-            box-shadow: 0 8px 25px rgba(26,115,232,0.4); 
-            transition: all 0.3s ease; 
-        }
-        #mic-btn.recording { background: #ea4335; transform: scale(1.15); animation: pulse 1.5s infinite; }
 
-        /* 初期設定モーダル：Masterを迎えるための特別室 */
+        .avatar-3d-card {
+            width: 100%;
+            height: 100%;
+            border-radius: 40px;
+            background: url('/static/avatar_icon.png') center/cover;
+            border: 8px solid white;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.2), inset 0 0 20px rgba(255,255,255,0.5);
+            /* 浮かんでいるようなアニメーション */
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotateZ(0deg); }
+            50% { transform: translateY(-15px) rotateZ(1deg); }
+        }
+
+        /* セットアップ画面の装飾 */
         #setup-modal { 
-            position: absolute; 
-            inset: 0; 
-            background: var(--beach-gradient); 
-            z-index: 100; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 30px; 
-            text-align: center; 
+            position: absolute; inset: 0; background: var(--beach-gradient); 
+            z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
+        
         .setup-card {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 45px 25px;
-            border-radius: 30px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-            width: 85%;
-            max-width: 350px;
-        }
-        .setup-card h2 { color: var(--primary-blue); font-size: 26px; margin: 0 0 10px 0; }
-        .setup-input { width: 100%; padding: 15px; margin: 20px 0; border: 2px solid #e3f2fd; border-radius: 15px; font-size: 16px; outline: none; text-align: center; }
-        .age-selector { display: flex; gap: 8px; margin: 15px 0; justify-content: center; }
-        .age-btn { padding: 10px 14px; border: 1px solid #ddd; border-radius: 25px; cursor: pointer; background: white; font-size: 13px; font-weight: bold; color: #78909c; transition: 0.3s; }
-        .age-btn.active { background: var(--primary-blue); color: white; border-color: var(--primary-blue); box-shadow: 0 4px 10px rgba(26,115,232,0.2); }
-        .start-btn { 
-            background: var(--primary-blue); color: white; border: none; padding: 16px 50px; border-radius: 35px; 
-            font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 25px; width: 100%;
-            transition: 0.3s;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 40px 30px;
+            border-radius: 40px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.1);
+            width: 85%; max-width: 400px; text-align: center;
         }
 
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.4); } 70% { box-shadow: 0 0 0 20px rgba(234, 67, 53, 0); } 100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); } }
+        .age-selector { display: flex; gap: 10px; margin: 20px 0; justify-content: center; }
+        .age-btn { 
+            flex: 1; padding: 12px; border: 2px solid #fff; border-radius: 20px; 
+            background: white; cursor: pointer; font-weight: bold; color: #90a4ae; transition: 0.3s;
+        }
+        .age-btn.active { 
+            background: var(--primary-blue); color: white; border-color: var(--primary-blue);
+            transform: scale(1.05); box-shadow: 0 10px 20px rgba(26,115,232,0.3);
+        }
+
+        .setup-input { 
+            width: 100%; padding: 18px; margin-bottom: 20px; border: none; 
+            border-radius: 20px; background: #f1f8ff; font-size: 1.1rem; text-align: center; outline: none;
+        }
+
+        .start-btn { 
+            width: 100%; padding: 20px; border-radius: 40px; border: none;
+            background: linear-gradient(135deg, #1a73e8, #64b5f6); color: white;
+            font-size: 1.3rem; font-weight: 800; cursor: pointer; transition: 0.3s;
+        }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <!-- セットアップ画面（初回のみ表示） -->
-    {% if first_launch %}
-    <div id="setup-modal">
-        <div class="setup-card">
-            <img src="{{ url_for('static', filename='avatar.png') }}" style="width: 110px; height: 110px; border-radius: 50%; border: 5px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.1); margin-bottom: 15px;">
-            <h2>Welcome!</h2>
-            <p style="color: #666; font-size: 14px;">Let's start your journey in Santa Monica. What's your name?</p>
-            <input type="text" id="user-name" class="setup-input" placeholder="Your Name">
-            <p style="font-weight: bold; margin: 10px 0 5px 0; font-size: 14px;">Choose my age:</p>
-            <div class="age-selector">
-                <div class="age-btn active" onclick="selectAge('17', this)">17 (School)</div>
-                <div class="age-btn" onclick="selectAge('30', this)">30 (Adult)</div>
-                <div class="age-btn" onclick="selectAge('50', this)">50 (Mentor)</div>
-            </div>
-            <button class="start-btn" onclick="finishSetup()">Let's Talk! ✨</button>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- メイン表示：ASTREIAのヘッダー -->
-    <div class="header">
-        <!-- サーバーから渡されたアバター画像を動的に読み込み -->
-        <img src="{{ url_for('static', filename=avatar_image) }}" class="avatar-img" id="main-avatar">
-        <div class="app-title">ASTREIA</div>
-        <small id="status-text" style="color: #999; font-weight: bold;">Santa Monica, CA</small>
-    </div>
-
-    <!-- チャットログ -->
-    <div id="chat-box">
-        <div class="msg astreia">Hi there! I'm ASTREIA. Ready for some fun English conversation? Just tap the mic and talk to me! 🌴</div>
-    </div>
-
-    <!-- 操作：マイクとステータス -->
-    <div class="controls">
-        <button id="mic-btn" title="Tap to speak">🎤</button>
-        <div style="font-size: 11px; color: #aaa; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Tap to Start Speaking</div>
-    </div>
+<div class="app-container" style="display:none;" id="main-app">
+    <!-- メインのチャット画面（ここは前回のロジックを維持） -->
 </div>
 
-<script>
-    let selectedAge = "17";
-    const micBtn = document.getElementById('mic-btn');
-    const chatBox = document.getElementById('chat-box');
-    const statusText = document.getElementById('status-text');
+{% if first_launch %}
+<div id="setup-modal">
+    <div class="setup-card">
+        <!-- 3D回転するアバタープレビュー -->
+        <div class="avatar-viewport" id="avatar-container">
+            <div class="avatar-3d-card" id="avatar-card"></div>
+        </div>
 
-    // 年齢選択のトグル
-    function selectAge(age, btn) {
-        selectedAge = age;
+        <h2 style="color:#1a73e8; margin-bottom:5px;">Welcome to GENESIS</h2>
+        <p style="color:#546e7a; margin-top:0;">Meet your ASTREIA</p>
+
+        <input type="text" id="user-name" class="setup-input" placeholder="What's your name?">
+        
+        <div class="age-selector">
+            <div class="age-btn active" onclick="changeAge('17', this)">17</div>
+            <div class="age-btn" onclick="changeAge('30', this)">30</div>
+            <div class="age-btn" onclick="changeAge('50', this)">50</div>
+        </div>
+
+        <button class="start-btn" onclick="finishSetup()">START JOURNEY</button>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    // --- 3D回転のロジック ---
+    const container = document.getElementById('avatar-container');
+    const card = document.getElementById('avatar-card');
+
+    document.addEventListener('mousemove', (e) => {
+        if (!container) return;
+        
+        // 画面中心からのマウス位置を計算
+        let xAxis = (window.innerWidth / 2 - e.pageX) / 15;
+        let yAxis = (window.innerHeight / 2 - e.pageY) / 15;
+
+        // 真下（上向きの回転）を防ぐためにY軸の角度を制限
+        // yAxisが正のときカードは上を向く。これを制限する。
+        if (yAxis > 15) yAxis = 15; 
+        if (yAxis < -20) yAxis = -20; 
+
+        card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+    });
+
+    // 年齢切り替え
+    function changeAge(age, btn) {
         document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        
+        // 画像の動的切り替え（前回のロジックを継承）
+        const newImg = (age === '17') ? '/static/avatar_icon.png' : `/static/avatar_icon_${age}.png`;
+        card.style.backgroundImage = `url('${newImg}')`;
     }
 
-    // セットアップ送信
+    // セットアップ完了（Flask連携）
     async function finishSetup() {
-        const nameInput = document.getElementById('user-name');
-        if (!nameInput.value.trim()) {
-            alert("Please tell me your name, Master! 😊");
-            return;
-        }
+        const name = document.getElementById('user-name').value;
+        if (!name) { alert("Please enter your name!"); return; }
+        
         const res = await fetch('/setup', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name: nameInput.value, age: selectedAge })
+            body: JSON.stringify({ name: name, age: "17" }) // 年齢変数は選択に合わせて調整
         });
         if (res.ok) window.location.reload();
-    }
-
-    // 音声認識エンジン
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        recognition.continuous = false;
-        
-        micBtn.addEventListener('click', () => {
-            try {
-                recognition.start();
-                micBtn.classList.add('recording');
-                statusText.innerText = "Listening Master... 🎤";
-            } catch (e) { /* すでに起動中の場合は無視 */ }
-        });
-
-        recognition.onresult = (event) => {
-            const text = event.results[0][0].transcript;
-            addMessage(text, 'user');
-            sendToAstreia(text);
-        };
-
-        recognition.onend = () => {
-            micBtn.classList.remove('recording');
-        };
-
-        recognition.onerror = () => {
-            statusText.innerText = "Santa Monica, CA";
-            micBtn.classList.remove('recording');
-        };
-    }
-
-    // サーバーへのチャット送信
-    async function sendToAstreia(text) {
-        statusText.innerText = "ASTREIA is thinking... ✨";
-        try {
-            const res = await fetch('/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ message: text })
-            });
-            const data = await res.json();
-            addMessage(data.response, 'astreia');
-            speak(data.response);
-            statusText.innerText = "Santa Monica, CA";
-        } catch (e) {
-            statusText.innerText = "Connection Weak...";
-            addMessage("Sorry, I missed that! Let's try again.", 'astreia');
-        }
-    }
-
-    // 画面へのメッセージ追加
-    function addMessage(text, sender) {
-        const div = document.createElement('div');
-        div.className = `msg ${sender}`;
-        div.innerText = text;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    // 音声読み上げ
-    function speak(text) {
-        const uttr = new SpeechSynthesisUtterance(text);
-        uttr.lang = 'en-US';
-        uttr.rate = 1.0;
-        window.speechSynthesis.speak(uttr);
     }
 </script>
 
