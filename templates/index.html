@@ -7,59 +7,199 @@
     
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='avatar_icon.png') }}">
     <link rel="manifest" href="/manifest.json">
-    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="ASTREIA">
     <meta name="theme-color" content="#ff69b4">
 
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fce4ec; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .avatar-container { flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
-        /* チャット画面の画像は縦長の avatar.png をきれいに表示 */
-        .avatar-container img { height: 100%; width: 100%; object-fit: cover; object-position: center; }
-        .chat-container { height: 40%; background: white; border-radius: 20px 20px 0 0; padding: 20px; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        .message-area { flex: 1; overflow-y: auto; margin-bottom: 10px; font-size: 16px; line-height: 1.5; color: #333; }
-        .input-area { display: flex; gap: 10px; align-items: center; }
-        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; outline: none; }
-        button { background: #ff69b4; color: white; border: none; padding: 12px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; }
-        .mic-button { background: #f06292; width: 45px; height: 45px; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        /* 全体の背景：サンタモニカの夕暮れをイメージしたグラデーション */
+        body { 
+            margin: 0; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background: linear-gradient(135deg, #fce4ec 0%, #ffe0b2 100%); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        /* アプリ本体のコンテナ（PCではスマホサイズ、スマホでは全画面） */
+        .app-container {
+            width: 100%;
+            max-width: 450px; /* PCでの最大幅 */
+            height: 100%;
+            max-height: 900px; /* PCでの最大高さ */
+            background: white;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* PCのみ角丸を適用 */
+        @media (min-width: 500px) {
+            .app-container {
+                border-radius: 30px;
+                height: 90vh;
+            }
+        }
+
+        /* 画像エリア */
+        .avatar-container { 
+            flex: 1; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+            background: #000;
+        }
+        .avatar-container img { 
+            height: 100%; 
+            width: 100%; 
+            object-fit: cover; 
+            object-position: center; 
+        }
+
+        /* チャットエリア */
+        .chat-container { 
+            height: 35%; 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(10px);
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            border-top: 1px solid rgba(0,0,0,0.05);
+        }
+        .message-area { 
+            flex: 1; 
+            overflow-y: auto; 
+            margin-bottom: 15px; 
+            font-size: 17px; 
+            line-height: 1.5; 
+            color: #444; 
+            font-weight: 500;
+            text-align: center;
+        }
+        .input-area { 
+            display: flex; 
+            gap: 12px; 
+            align-items: center; 
+        }
+        input { 
+            flex: 1; 
+            padding: 12px 18px; 
+            border: 1px solid #eee; 
+            border-radius: 25px; 
+            outline: none; 
+            font-size: 16px; 
+            background: #f8f8f8;
+        }
+        .mic-button { 
+            background: #f06292; 
+            width: 50px; 
+            height: 50px; 
+            border-radius: 50%; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer; 
+            font-size: 24px; 
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(240, 98, 146, 0.3);
+        }
+        .mic-active { 
+            background: #ff1744; 
+            transform: scale(1.1); 
+            box-shadow: 0 0 20px rgba(255, 23, 68, 0.5); 
+        }
+        .send-btn {
+            background: #ff69b4;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-<div class="avatar-container">
-    <img src="{{ url_for('static', filename='avatar.png') }}" alt="ASTREIA">
-</div>
-
-<div class="chat-container">
-    <div class="message-area" id="chat-box">
-        "Tap the mic and say Hi!"
+<div class="app-container">
+    <div class="avatar-container">
+        <img src="{{ url_for('static', filename='avatar.png') }}" alt="ASTREIA">
     </div>
-    <div class="input-area">
-        <div class="mic-button">🎤</div>
-        <input type="text" id="user-input" placeholder="Talk to Astreia...">
-        <button onclick="sendMessage()">Send</button>
+
+    <div class="chat-container">
+        <div class="message-area" id="chat-box">"Tap the mic and say Hi!"</div>
+        <div class="input-area">
+            <div class="mic-button" id="mic-btn">🎤</div>
+            <input type="text" id="user-input" placeholder="Message...">
+            <button class="send-btn" onclick="sendMessage()">Send</button>
+        </div>
     </div>
 </div>
 
 <script>
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const micBtn = document.getElementById('mic-btn');
+
+    // 音声読み上げ
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        const uttr = new SpeechSynthesisUtterance(text);
+        uttr.lang = 'en-US';
+        uttr.rate = 1.0;
+        window.speechSynthesis.speak(uttr);
+    }
+
+    // 音声認識
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+
+    micBtn.onclick = () => {
+        recognition.start();
+        micBtn.classList.add('mic-active');
+        chatBox.innerText = "Listening...";
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        userInput.value = transcript;
+        micBtn.classList.remove('mic-active');
+        sendMessage();
+    };
+
+    recognition.onerror = () => {
+        micBtn.classList.remove('mic-active');
+        chatBox.innerText = "Try again...";
+    };
+
+    // メッセージ送信
     async function sendMessage() {
-        const input = document.getElementById('user-input');
-        const box = document.getElementById('chat-box');
-        if (!input.value) return;
+        const text = userInput.value;
+        if (!text) return;
 
-        const text = input.value;
-        input.value = '';
-        box.innerText = "Thinking...";
+        userInput.value = '';
+        chatBox.innerText = "Thinking...";
 
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text })
-        });
-        const data = await response.json();
-        box.innerText = data.response;
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await response.json();
+            chatBox.innerText = data.response;
+            speak(data.response);
+        } catch (e) {
+            chatBox.innerText = "Connection error...";
+        }
     }
 </script>
 
