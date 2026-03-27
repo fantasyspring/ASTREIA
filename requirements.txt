@@ -1,4 +1,4 @@
-streamlit
+flask
 google-generativeai
-gTTS
-streamlit-mic-recorder
+python-dotenv
+gunicorn
