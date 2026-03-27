@@ -10,6 +10,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- GENESIS 2026 鉄壁の設定 ---
+# 環境変数からAPIキーを取得
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -18,16 +19,24 @@ USER_DATA_FILE = 'user_data.json'
 # 利用可能な最高のモデルを自動選択
 MODELS_TO_TRY = ["gemini-3.1-pro-preview", "gemini-3.1-flash-live-preview", "gemini-2.5-flash"]
 model = None
+selected_model_name = ""
+
 for m_name in MODELS_TO_TRY:
     try:
         test_model = genai.GenerativeModel(m_name)
+        # 接続テスト
         test_model.generate_content("test", generation_config={"max_output_tokens": 1})
         model = test_model
-        print(f"GENESIS: Connected to [{m_name}]")
+        selected_model_name = m_name
+        print(f"GENESIS: Connected to [{selected_model_name}]")
         break
-    except: continue
+    except:
+        continue
+
 if not model:
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    selected_model_name = "gemini-2.5-flash"
+    model = genai.GenerativeModel(selected_model_name)
+    print(f"GENESIS: Fallback to [{selected_model_name}]")
 
 # --- ユーザーデータ管理ロジック ---
 def load_user_data():
@@ -53,18 +62,21 @@ PERSONA_CATALOG = {
 @app.route('/')
 def index():
     user_data = load_user_data()
-    # ユーザーデータがなければ初期設定（初回起動）
+    # ユーザーデータがなければ初期設定（初回起動）フラグ
     first_launch = True if user_data is None else False
     
     can_change = True
-    avatar_img = "avatar.png"
+    avatar_img = "avatar.png" # デフォルト
     
     if user_data:
         # 10日間のカウントダウン
-        install_date = datetime.datetime.fromisoformat(user_data['install_date'])
-        days_passed = (datetime.datetime.now() - install_date).days
-        if days_passed > 10:
-            can_change = False
+        install_date_str = user_data.get('install_date')
+        if install_date_str:
+            install_date = datetime.datetime.fromisoformat(install_date_str)
+            days_passed = (datetime.datetime.now() - install_date).days
+            if days_passed > 10:
+                can_change = False
+        
         # 現在のアバター画像を取得
         age = user_data.get('selected_age', '17')
         avatar_img = PERSONA_CATALOG.get(age, PERSONA_CATALOG["17"])["image"]
@@ -86,8 +98,8 @@ def setup():
         "user_name": setup_data.get("name", "Friend"),
         "selected_age": setup_data.get("age", "17"),
         "install_date": datetime.datetime.now().isoformat(),
-        "memory": [], # 会話から得たユーザーの好みを保存
-        "chat_history": [] # 会話の流れを保持
+        "memory": [], 
+        "chat_history": [] 
     }
     save_user_data(new_data)
     return jsonify({"status": "success"})
@@ -132,15 +144,18 @@ def chat():
 
         # 記憶の自動保存
         if "[MEM]" in ai_response:
-            new_info = ai_response.split("[MEM]")[1].split(".")[0].strip()
-            if new_info not in user_data['memory']:
-                user_data['memory'].append(new_info)
-            ai_response = ai_response.replace(f"[MEM]{new_info}", "").strip()
+            parts = ai_response.split("[MEM]")
+            if len(parts) > 1:
+                new_info = parts[1].split(".")[0].strip()
+                if new_info not in user_data['memory']:
+                    user_data['memory'].append(new_info)
+                ai_response = ai_response.replace(f"[MEM]{new_info}", "").strip()
 
         # 履歴を更新して保存
         user_data['chat_history'].append({"role": "user", "parts": [user_input]})
         user_data['chat_history'].append({"role": "model", "parts": [ai_response]})
-        if len(user_data['chat_history']) > 20: user_data['chat_history'] = user_data['chat_history'][-20:]
+        if len(user_data['chat_history']) > 20: 
+            user_data['chat_history'] = user_data['chat_history'][-20:]
         save_user_data(user_data)
 
         return jsonify({'response': ai_response})
@@ -148,5 +163,9 @@ def chat():
         print(f"Chat Error: {e}")
         return jsonify({'response': "Sorry, my signal is weak! Can you say that again?"})
 
+# --- Renderデプロイ用のポートバインド設定 ---
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Render環境ではPORT環境変数が指定されます。ローカルでは10000を使用します。
+    port = int(os.environ.get("PORT", 10000))
+    # host='0.0.0.0' にすることで外部からのアクセスを許可します。
+    app.run(host='0.0.0.0', port=port, debug=False)
