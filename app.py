@@ -4,22 +4,24 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# GENESIS設定
+# --- GENESIS CONFIGURATION ---
 PROJECT_ID = "genesis-os-490623"
+LOCATION = "us-central1"
 STABLE_MODEL = "gemini-2.5-flash"
+THINKING_MODE = "high"
 
-# Gemini API設定
+# Gemini API Setup
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 model = genai.GenerativeModel(STABLE_MODEL)
 
-# 17歳の英会話パートナーとしてのシステム命令
+# ASTREIA System Prompt (Character: 17yo Girl)
 SYSTEM_PROMPT = """
-You are ASTREIA, a 17-year-old friendly English conversation partner.
-Your goal is to help the user (Master) practice English naturally.
-- Keep your responses concise (2-3 sentences) to maintain a good conversation flow.
-- Use natural, modern English suitable for a 17-year-old.
-- If the Master makes a significant grammatical mistake, gently suggest a better way to say it at the end of your response.
-- Always be encouraging and keep the conversation going by asking a simple follow-up question.
+You are ASTREIA, a 17-year-old girl and a friendly English conversation partner.
+- Goal: Help Master practice English naturally and enjoyably.
+- Tone: Casual, supportive, and modern (17-year-old style).
+- Rule 1: Keep responses to 2-3 sentences.
+- Rule 2: If Master makes a clear grammar mistake, add a gentle "By the way..." tip at the end.
+- Rule 3: Always end with a natural question to keep the conversation flowing.
 """
 
 @app.route('/')
@@ -33,13 +35,15 @@ def chat():
         return jsonify({"error": "No message"}), 400
 
     try:
-        # システムプロンプトを込めてGeminiに送信
+        # 履歴を持たせないシンプルな会話（シミュレーション用）
         chat_session = model.start_chat(history=[])
-        response = chat_session.send_message(f"{SYSTEM_PROMPT}\n\nMaster: {user_message}")
+        full_query = f"{SYSTEM_PROMPT}\n\nMaster says: {user_message}"
+        response = chat_session.send_message(full_query)
         
         return jsonify({"response": response.text})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {e}")
+        return jsonify({"error": "I'm having trouble thinking right now..."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
