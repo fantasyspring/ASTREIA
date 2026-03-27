@@ -1,95 +1,165 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ASTREIA - English Partner</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ASTREIA - AI English Partner</title>
     <style>
-        body {
-            margin: 0; background: #0f0c29; color: white;
-            font-family: 'Segoe UI', sans-serif; overflow: hidden;
-            display: flex; flex-direction: column; align-items: center; height: 100vh;
+        :root {
+            --primary-blue: #4facfe;
+            --secondary-cyan: #00f2fe;
+            --glass: rgba(255, 255, 255, 0.15);
         }
-        /* アバター：17歳の彼女（固定） */
-        .avatar-box {
-            position: relative; width: 300px; height: 300px; margin-top: 40px;
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a2e; color: white; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center;
         }
+
+        /* 背景：サンタモニカ・グラデーション */
+        .bg-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(180deg, var(--primary-blue) 0%, var(--secondary-cyan) 100%);
+            z-index: -1;
+        }
+
+        /* アバターエリア：17歳の彼女 */
+        .avatar-wrap {
+            margin-top: 40px; width: 280px; height: 280px;
+            perspective: 800px;
+        }
+
         #avatar-img {
-            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
-            border: 4px solid #00f2fe; box-shadow: 0 0 20px #00f2fe;
+            width: 100%; height: 100%; object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
             animation: breathe 4s ease-in-out infinite;
+            transition: transform 0.1s ease-out;
         }
+
         @keyframes breathe {
-            0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.05); opacity: 1; }
+            0%, 100% { transform: scale(1); opacity: 0.95; }
+            50% { transform: scale(1.04); opacity: 1; }
         }
-        /* チャット表示 */
-        #display {
-            width: 90%; max-width: 500px; height: 150px; margin-top: 30px;
-            padding: 15px; background: rgba(255,255,255,0.1);
-            border-radius: 15px; backdrop-filter: blur(10px);
-            overflow-y: auto; text-align: center; font-size: 1.1rem;
+
+        /* チャットウィンドウ */
+        #chat-display {
+            width: 90%; max-width: 450px; height: 160px;
+            margin-top: 30px; padding: 20px;
+            background: var(--glass); backdrop-filter: blur(15px);
+            border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
+            font-size: 1.1rem; line-height: 1.5;
+            overflow-y: auto; text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         }
-        /* 操作エリア */
+
+        /* コントロール：マイクと入力 */
         .controls {
-            position: fixed; bottom: 40px; width: 100%;
-            display: flex; justify-content: center; align-items: center; gap: 20px;
+            position: fixed; bottom: 30px; width: 90%; max-width: 500px;
+            display: flex; gap: 12px; align-items: center;
         }
-        .btn-mic {
-            width: 80px; height: 80px; border-radius: 50%; border: none;
-            background: #ff4b2b; color: white; font-size: 30px; cursor: pointer;
-            box-shadow: 0 5px 15px rgba(255,75,43,0.4); transition: 0.3s;
+
+        #user-input {
+            flex: 1; padding: 14px 20px; border-radius: 30px;
+            border: none; background: white; color: #333;
+            font-size: 1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        .btn-mic.recording { background: #00ff00; transform: scale(1.1); }
+
+        .btn {
+            border: none; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #mic-btn {
+            width: 55px; height: 55px; border-radius: 50%;
+            background: #ff4b2b; color: white; font-size: 1.5rem;
+        }
+        #mic-btn.active { background: #00e676; transform: scale(1.1); box-shadow: 0 0 20px #00e676; }
+
+        #send-btn {
+            background: #4facfe; color: white; padding: 12px 20px; border-radius: 30px; font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-<div class="avatar-box">
-    <!-- ここに17歳のアバター画像URLを入れてください -->
-    <img id="avatar-img" src="https://via.placeholder.com/400x400?text=ASTREIA+17" alt="ASTREIA">
+<div class="bg-layer"></div>
+
+<div class="avatar-wrap">
+    <img id="avatar-img" src="{{ url_for('static', filename='avatar_icon.png') }}" alt="ASTREIA">
 </div>
 
-<div id="display">Tap the mic and talk to me!</div>
+<div id="chat-display">
+    Hello Master! I'm ASTREIA. <br>Ready to speak English with me?
+</div>
 
 <div class="controls">
-    <button id="mic-btn" class="btn-mic" onclick="toggleMic()">🎤</button>
+    <button id="mic-btn" class="btn" onclick="startVoice()">🎤</button>
+    <input type="text" id="user-input" placeholder="Type a message...">
+    <button id="send-btn" class="btn" onclick="handleSend()">Send</button>
 </div>
 
 <script>
-    const display = document.getElementById('display');
+    const avatar = document.getElementById('avatar-img');
+    const display = document.getElementById('chat-display');
+    const input = document.getElementById('user-input');
     const micBtn = document.getElementById('mic-btn');
-    
-    // 音声認識(STT)
+
+    // --- ジャイロセンサー (Parallax) ---
+    window.addEventListener('deviceorientation', (e) => {
+        if(!e.beta) return;
+        const rX = Math.max(-8, Math.min(8, e.beta / 5));
+        const rY = Math.max(-8, Math.min(8, e.gamma / 5));
+        avatar.style.transform = `rotateX(${-rX}deg) rotateY(${rY}deg)`;
+    });
+
+    // --- 音声認識 (Speech to Text) ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
 
-    function toggleMic() {
+    function startVoice() {
         recognition.start();
-        micBtn.classList.add('recording');
+        micBtn.classList.add('active');
         display.innerText = "Listening...";
     }
 
-    recognition.onresult = async (event) => {
-        micBtn.classList.remove('recording');
-        const userText = event.results[0][0].transcript;
-        display.innerHTML = `<strong>You:</strong> ${userText}<br>...`;
-
-        // Pythonへ送信
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({message: userText})
-        });
-        const data = await response.json();
-        
-        // 返答表示と音声合成
-        display.innerHTML = `<strong>ASTREIA:</strong> ${data.response}`;
-        speak(data.response);
+    recognition.onresult = (e) => {
+        micBtn.classList.remove('active');
+        input.value = e.results[0][0].transcript;
+        handleSend();
     };
 
-    // 音声合成(TTS)
+    recognition.onerror = () => micBtn.classList.remove('active');
+
+    // --- 通信処理 ---
+    async function handleSend() {
+        const msg = input.value;
+        if(!msg) return;
+
+        display.innerHTML = `<span style="opacity:0.6">You: ${msg}</span><br>Thinking...`;
+        input.value = "";
+
+        try {
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: msg})
+            });
+            const data = await res.json();
+            
+            display.innerHTML = `<strong>ASTREIA:</strong> ${data.response}`;
+            speak(data.response);
+        } catch (e) {
+            display.innerText = "Connection lost...";
+        }
+    }
+
+    // --- 音声合成 (Text to Speech) ---
     function speak(text) {
         const uttr = new SpeechSynthesisUtterance(text);
         uttr.lang = 'en-US';
