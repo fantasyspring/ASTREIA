@@ -1,46 +1,36 @@
-import streamlit as st
-import random
+import os
+from flask import Flask, render_template, request, jsonify
+import google.generativeai as genai
 
-# --- ASTREIAの基本設定 ---
-st.set_page_config(page_title="ASTREIA Buddy", page_icon="🎙️")
+app = Flask(__name__)
 
-def main():
-    st.title("🎙️ ASTREIA - Your English Buddy")
-    
-    # サイドバー：Mousegirl専用の「バディ・メモリー」
-    with st.sidebar:
-        st.header("👤 Buddy Memory")
-        st.info("User: Mousegirl\nStatus: Learning English\nGoal: Global Friendship")
-        # 将来的にSQLiteから読み込むデータをここに表示
-        st.write("---")
-        st.image("https://via.placeholder.com/150", caption="ASTREIA (Placeholder)")
+# Render上のEnvironment VariablesからAPIキーを読み込みます
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
 
-    # チャット履歴の初期化
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hello Mousegirl! I'm ASTREIA. Ready to practice? What are you wearing today?"}
-        ]
+# AIモデルの初期設定
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-    # 履歴の表示
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-    # 入力フォーム
-    if prompt := st.chat_input("Say something to ASTREIA..."):
-        # ユーザーの入力を表示
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_message = request.json.get("message")
+    if not user_message:
+        return jsonify({"error": "No message"}), 400
 
-        # --- ここが将来のAI（Gemini）接続ポイント ---
-        # 現時点では簡易レスポンス
-        response = f"I hear you! You said: '{prompt}'. (Connecting Gemini API in Phase 2...)"
-        
-        # ASTREIAの返答を表示
-        with st.chat_message("assistant"):
-            st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    try:
+        # ASTREIAとしての性格付け（必要に応じて調整してください）
+        prompt = f"You are ASTREIA, a friendly English teacher. Reply to the user: {user_message}"
+        response = model.generate_content(prompt)
+        return jsonify({"reply": response.text})
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    main()
+    # 【最重要】Renderのポート番号に対応するための設定です
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
