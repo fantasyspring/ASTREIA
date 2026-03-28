@@ -2,17 +2,17 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ASTREIA</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             font-family: 'Helvetica Neue', Arial, sans-serif;
             background-color: #ffffff; color: #333;
-            display: flex; flex-direction: column;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* 上部のアバター画像エリア（画像に忠実に） */
+        /* 上部のアバター画像エリア */
         .avatar-area {
             width: 100%;
             flex: 1;
@@ -23,13 +23,28 @@
         #avatar-img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* 画像全体を綺麗に表示 */
+            object-fit: cover;
+        }
+
+        /* 吹き出し（中央付近に表示） */
+        #display-text {
+            position: absolute;
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.95);
+            padding: 15px 25px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 80%;
+            text-align: center;
+            display: none;
+            z-index: 10;
         }
 
         /* ガイドメッセージ */
         .guide-text {
             text-align: center;
-            padding: 20px 0;
+            padding: 15px 0;
             font-size: 18px;
             color: #666;
             background: #fff;
@@ -37,30 +52,29 @@
 
         /* 下部の操作エリア */
         .ui-container {
-            padding: 10px 20px 30px;
+            padding: 10px 20px 40px;
             display: flex;
             align-items: center;
             gap: 10px;
             background: #fff;
         }
 
-        /* ピンクのマイクボタン（画像の位置と色） */
         #mic-btn {
-            width: 45px; height: 45px;
-            background-color: #ff69b4; /* 画像のピンク色 */
+            width: 50px; height: 50px;
+            background-color: #f06292;
             border-radius: 50%;
             border: none;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer;
-            box-shadow: 0 2px 10px rgba(255, 105, 180, 0.4);
-            flex-shrink: 0;
+            box-shadow: 0 2px 10px rgba(240, 98, 146, 0.4);
+            flex-shrink: 0; font-size: 24px; color: white;
         }
-        #mic-btn.active { background-color: #ff1493; transform: scale(1.1); }
+        #mic-btn.active { background-color: #e91e63; animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.6; } }
 
-        /* 入力ボックス */
         #user-input {
             flex-grow: 1;
-            height: 45px;
+            height: 48px;
             border-radius: 25px;
             border: 1px solid #eee;
             background-color: #f8f8f8;
@@ -69,35 +83,34 @@
             outline: none;
         }
 
-        /* 送信ボタン（画像に合わせてピンク） */
         #send-btn {
-            background-color: #ff69b4;
+            background-color: #f06292;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
+            padding: 10px 24px;
+            border-radius: 25px;
             font-weight: bold;
             cursor: pointer;
         }
 
-        /* 吹き出し（必要に応じて表示） */
-        #display-text {
-            position: absolute;
-            top: 60%; left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255,255,255,0.9);
-            padding: 15px 25px;
-            border-radius: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-width: 80%;
-            display: none; /* 会話が始まったら表示 */
+        /* --- 初回起動用のセットアップ画面 --- */
+        #setup-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; display: none;
+        }
+        .setup-box {
+            background: white; padding: 30px; border-radius: 20px; width: 80%; text-align: center;
+        }
+        .setup-box input {
+            width: 80%; padding: 12px; margin: 20px 0; border: 1px solid #ddd; border-radius: 10px;
         }
     </style>
 </head>
 <body>
 
 <div class="avatar-area">
-    <!-- Masterの画像パスを指定 -->
     <img id="avatar-img" src="{{ url_for('static', filename='avatar_icon.png') }}" alt="ASTREIA">
     <div id="display-text"></div>
 </div>
@@ -110,42 +123,80 @@
     <button id="send-btn" onclick="sendMessage()">Send</button>
 </div>
 
+<!-- セットアップ用モーダル -->
+<div id="setup-overlay">
+    <div class="setup-box">
+        <h3>Welcome Master!</h3>
+        <p>What should I call you?</p>
+        <input type="text" id="setup-name" placeholder="Enter your name">
+        <br>
+        <button id="send-btn" onclick="completeSetup()">Start Chat</button>
+    </div>
+</div>
+
 <script>
     const display = document.getElementById('display-text');
     const input = document.getElementById('user-input');
+    const micBtn = document.getElementById('mic-btn');
 
-    // 音声認識
+    // --- 1. 初回起動チェック ---
+    {% if first_launch %}
+    document.getElementById('setup-overlay').style.display = 'flex';
+    {% endif %}
+
+    async function completeSetup() {
+        const name = document.getElementById('setup-name').value;
+        if (!name) return;
+        
+        await fetch('/setup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        });
+        document.getElementById('setup-overlay').style.display = 'none';
+        display.style.display = 'block';
+        display.innerText = "Hi! Let's talk!";
+    }
+
+    // --- 2. 音声認識 ---
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'en-US';
 
     function startRecognition() {
         recognition.start();
-        document.getElementById('mic-btn').classList.add('active');
+        micBtn.classList.add('active');
     }
 
     recognition.onresult = (event) => {
-        document.getElementById('mic-btn').classList.remove('active');
+        micBtn.classList.remove('active');
         input.value = event.results[0][0].transcript;
         sendMessage();
     };
 
+    recognition.onerror = () => micBtn.classList.remove('active');
+
+    // --- 3. メッセージ送信 ---
     async function sendMessage() {
         const text = input.value;
         if (!text) return;
 
         display.style.display = 'block';
         display.innerText = "Thinking...";
-        
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({message: text})
-        });
-        const data = await response.json();
-        
-        display.innerText = data.response;
-        speak(data.response);
         input.value = "";
+        
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: text})
+            });
+            const data = await response.json();
+            
+            display.innerText = data.response;
+            speak(data.response);
+        } catch (e) {
+            display.innerText = "Error connecting to ASTREIA...";
+        }
     }
 
     function speak(text) {
