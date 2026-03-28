@@ -8,71 +8,116 @@
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #ffffff; display: flex; flex-direction: column; overflow: hidden;
+            background-color: #ffffff; color: #333;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* アバターエリア */
+        /* アバターエリア（全面表示） */
         .avatar-area {
-            width: 100%; flex: 1; overflow: hidden; position: relative;
+            width: 100%;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
         }
-        #avatar-img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 吹き出し */
+        #avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 吹き出し（画像の位置に合わせる） */
         #display-text {
-            position: absolute; bottom: 20px; left: 50%;
+            position: absolute;
+            bottom: 30px; left: 50%;
             transform: translateX(-50%);
             background: rgba(255,255,255,0.95);
-            padding: 15px 25px; border-radius: 20px;
+            padding: 15px 25px;
+            border-radius: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 80%; text-align: center; font-size: 1.1rem;
-            display: none; z-index: 10;
+            width: 85%;
+            text-align: center;
+            font-size: 1.1rem;
+            display: none;
+            z-index: 10;
+        }
+
+        /* ガイドテキスト */
+        .guide-text {
+            text-align: center;
+            padding: 10px 0;
+            font-size: 16px;
+            color: #888;
         }
 
         /* 操作エリア */
-        .guide-text { text-align: center; padding: 10px 0; font-size: 16px; color: #888; }
         .ui-container {
-            padding: 10px 20px 40px; display: flex; align-items: center; gap: 10px;
+            padding: 5px 20px 35px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
-        /* マイクボタンのアニメーション */
+        /* ピンクのマイクボタン */
         #mic-btn {
-            width: 50px; height: 50px; background-color: #f06292;
-            border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 24px; color: white; transition: 0.3s;
+            width: 55px; height: 55px;
+            background-color: #f06292;
+            border-radius: 50%;
+            border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(240, 98, 146, 0.4);
+            flex-shrink: 0; font-size: 26px; color: white;
+            transition: 0.3s;
         }
+        
         #mic-btn.active {
-            background-color: #ff1744;
-            animation: pulse 1.2s infinite;
-            box-shadow: 0 0 0 10px rgba(255, 23, 68, 0.2);
+            background-color: #e91e63;
+            animation: pulse 1s infinite;
         }
         @keyframes pulse {
             0% { transform: scale(1); }
-            50% { transform: scale(1.15); }
+            50% { transform: scale(1.1); opacity: 0.8; }
             100% { transform: scale(1); }
         }
 
         #user-input {
-            flex-grow: 1; height: 48px; border-radius: 25px; border: 1px solid #eee;
-            background-color: #f8f8f8; padding: 0 20px; font-size: 16px; outline: none;
+            flex-grow: 1;
+            height: 50px;
+            border-radius: 25px;
+            border: 1px solid #eee;
+            background-color: #f8f8f8;
+            padding: 0 20px;
+            font-size: 16px;
+            outline: none;
         }
 
         #send-btn {
-            background-color: #f06292; color: white; border: none;
-            padding: 10px 24px; border-radius: 25px; font-weight: bold;
+            background-color: #f06292;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
         }
 
-        /* セットアップ用 */
+        /* セットアップ用オーバーレイ */
         #setup-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 100;
-            display: none;
+            background: rgba(0,0,0,0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; display: none;
+        }
+        .setup-box {
+            background: white; padding: 30px; border-radius: 25px; width: 80%; text-align: center;
         }
     </style>
 </head>
 <body>
 
 <div class="avatar-area">
-    <img id="avatar-img" src="{{ url_for('static', filename='avatar_icon.png') }}">
+    <img id="avatar-img" src="{{ url_for('static', filename='avatar_icon.png') }}" alt="ASTREIA">
     <div id="display-text"></div>
 </div>
 
@@ -84,15 +129,52 @@
     <button id="send-btn" onclick="sendMessage()">Send</button>
 </div>
 
+<!-- 初回用名前入力 -->
+<div id="setup-overlay">
+    <div class="setup-box">
+        <h3>Welcome Master!</h3>
+        <p>What's your name?</p>
+        <input type="text" id="setup-name" style="width:80%; padding:10px; margin:15px; border-radius:10px; border:1px solid #ddd;" placeholder="Your Name">
+        <br>
+        <button id="send-btn" style="width:100%" onclick="completeSetup()">Start</button>
+    </div>
+</div>
+
 <script>
     const display = document.getElementById('display-text');
     const input = document.getElementById('user-input');
     const micBtn = document.getElementById('mic-btn');
 
-    // --- 音声合成の初期化（iPhone対策：一度空の音を鳴らす） ---
-    function initAudio() {
-        const silent = new SpeechSynthesisUtterance("");
-        window.speechSynthesis.speak(silent);
+    // --- 音声ロック強制解除ロジック ---
+    let audioUnlocked = false;
+    function unlockAudio() {
+        if (!audioUnlocked) {
+            const silent = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(silent);
+            audioUnlocked = true;
+            console.log("Audio Unlocked");
+        }
+    }
+
+    // --- 初回セットアップ判定 ---
+    {% if first_launch %}
+    document.getElementById('setup-overlay').style.display = 'flex';
+    {% endif %}
+
+    async function completeSetup() {
+        unlockAudio(); // ここで音声を許可
+        const name = document.getElementById('setup-name').value;
+        if (!name) return;
+        
+        await fetch('/setup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        });
+        document.getElementById('setup-overlay').style.display = 'none';
+        display.style.display = 'block';
+        display.innerText = "Hi! I'm ASTREIA. Nice to meet you!";
+        speak("Hi! I am ASTREIA. Nice to meet you!");
     }
 
     // --- 音声認識 ---
@@ -101,12 +183,12 @@
     recognition.interimResults = false;
 
     function startRecognition() {
-        initAudio(); // タップした瞬間に音声を有効化
+        unlockAudio(); // マイクを叩いた瞬間に音声再生を許可
         try {
             recognition.start();
             micBtn.classList.add('active');
             input.placeholder = "Listening...";
-        } catch (e) { console.log("Recognition already started"); }
+        } catch (e) { console.log("Mic already active"); }
     }
 
     recognition.onresult = (event) => {
@@ -120,7 +202,9 @@
         input.placeholder = "Message...";
     };
 
+    // --- チャット送信 ---
     async function sendMessage() {
+        unlockAudio(); // 送信ボタンでもロック解除
         const text = input.value;
         if (!text) return;
 
@@ -143,15 +227,20 @@
         }
     }
 
+    // --- 音声合成 ---
     function speak(text) {
-        // 全ての音声を一旦止めてから再生
         window.speechSynthesis.cancel();
         const uttr = new SpeechSynthesisUtterance(text);
         uttr.lang = 'en-US';
         uttr.rate = 1.0;
-        uttr.pitch = 1.1; // 17歳っぽく少し高めに
+        uttr.pitch = 1.1; // 17歳らしく
+        
+        uttr.onstart = () => console.log("ASTREIA is speaking...");
+        uttr.onerror = (e) => console.error("Speech error:", e);
+        
         window.speechSynthesis.speak(uttr);
     }
 </script>
+
 </body>
 </html>
