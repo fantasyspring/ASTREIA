@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -12,13 +12,11 @@
             display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* アバターエリア */
         .avatar-area {
             width: 100%; flex: 1; overflow: hidden; position: relative;
         }
         #avatar-img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 吹き出し */
         #display-text {
             position: absolute; bottom: 30px; left: 50%;
             transform: translateX(-50%);
@@ -31,7 +29,6 @@
 
         .guide-text { text-align: center; padding: 10px 0; font-size: 16px; color: #888; }
 
-        /* 操作エリア */
         .ui-container { padding: 5px 20px 35px; display: flex; align-items: center; gap: 12px; }
 
         #mic-btn {
@@ -50,7 +47,6 @@
 
         #send-btn { background-color: #f06292; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; }
 
-        /* ステップ式セットアップ画面 */
         #setup-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 100;
@@ -78,21 +74,17 @@
     <button id="send-btn" onclick="sendMessage()">Send</button>
 </div>
 
-<!-- ステップ式セットアップ -->
 <div id="setup-overlay">
     <div class="setup-box">
-        <!-- ステップ1: 自分の名前 -->
         <div id="step1" class="step active">
             <h3>Step 1</h3>
-            <p>What's your name?<br>(君の名前を教えて！)</p>
-            <input type="text" id="setup-user-name" placeholder="Name">
+            <p>What's your name?</p>
+            <input type="text" id="setup-user-name" placeholder="Master Name">
             <button id="send-btn" style="width:100%" onclick="nextStep()">Next</button>
         </div>
-
-        <!-- ステップ2: アバターの名前 -->
         <div id="step2" class="step">
             <h3>Step 2</h3>
-            <p>What's my name?<br>(私をなんて呼ぶ？)</p>
+            <p>What's my name?</p>
             <input type="text" id="setup-ai-name" placeholder="Avatar Name">
             <button id="send-btn" style="width:100%" onclick="completeSetup()">Start Chat</button>
         </div>
@@ -113,7 +105,6 @@
         }
     }
 
-    // 初回起動判定
     {% if first_launch %}
     document.getElementById('setup-overlay').style.display = 'flex';
     {% endif %}
@@ -130,29 +121,24 @@
         unlockAudio();
         const userName = document.getElementById('setup-user-name').value;
         const aiName = document.getElementById('setup-ai-name').value || "ASTREIA";
-        
         await fetch('/setup', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({name: userName, ai_name: aiName})
         });
-        
         document.getElementById('setup-overlay').style.display = 'none';
         display.style.display = 'block';
-        const msg = `Hi ${userName}! I'm ${aiName}! Let's talk!`;
+        const msg = `Hi ${userName}! I'm ${aiName}. Let's talk!`;
         display.innerText = msg;
         speak(msg);
     }
 
-    // 音声認識
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'en-US';
-
     function startRecognition() {
         unlockAudio();
         try { recognition.start(); micBtn.classList.add('active'); } catch (e) {}
     }
-
     recognition.onresult = (event) => {
         input.value = event.results[0][0].transcript;
         sendMessage();
@@ -178,14 +164,23 @@
         } catch (e) { display.innerText = "Error..."; }
     }
 
-    // --- 音声設定: 超・元気なハイトーン ---
     function speak(text) {
         window.speechSynthesis.cancel();
         const uttr = new SpeechSynthesisUtterance(text);
+        const voices = window.speechSynthesis.getVoices();
+        const bestVoice = voices.find(v => v.name.includes('Samantha')) || 
+                         voices.find(v => v.lang.includes('en-US') && v.name.includes('Female')) ||
+                         voices.find(v => v.lang.includes('en-US'));
+
+        if (bestVoice) { uttr.voice = bestVoice; }
         uttr.lang = 'en-US';
-        uttr.rate = 1.2;  // さらに少し速くして活発さをアップ
-        uttr.pitch = 1.5; // 最大級に高く設定して「女の子らしさ」を強調
+        uttr.rate = 1.0;  
+        uttr.pitch = 1.1; 
         window.speechSynthesis.speak(uttr);
+    }
+
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
 </script>
 </body>
