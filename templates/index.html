@@ -26,7 +26,7 @@
             object-fit: cover;
         }
 
-        /* 吹き出し（画像の位置に合わせる） */
+        /* 吹き出し */
         #display-text {
             position: absolute;
             bottom: 30px; left: 50%;
@@ -58,7 +58,6 @@
             gap: 12px;
         }
 
-        /* ピンクのマイクボタン */
         #mic-btn {
             width: 55px; height: 55px;
             background-color: #f06292;
@@ -110,14 +109,20 @@
             z-index: 100; display: none;
         }
         .setup-box {
-            background: white; padding: 30px; border-radius: 25px; width: 80%; text-align: center;
+            background: white; padding: 30px; border-radius: 25px; width: 85%; text-align: center;
+            box-sizing: border-box;
+        }
+        .setup-box h3 { color: #e91e63; margin-top: 0; }
+        .setup-box label { display: block; text-align: left; margin-left: 10%; font-size: 14px; color: #666; }
+        .setup-box input {
+            width: 80%; padding: 12px; margin: 8px 0 20px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px;
         }
     </style>
 </head>
 <body>
 
 <div class="avatar-area">
-    <img id="avatar-img" src="{{ url_for('static', filename='avatar_icon.png') }}" alt="ASTREIA">
+    <img id="avatar-img" src="{{ url_for('static', filename='avatar_icon.png') }}" alt="Avatar">
     <div id="display-text"></div>
 </div>
 
@@ -129,12 +134,16 @@
     <button id="send-btn" onclick="sendMessage()">Send</button>
 </div>
 
-<!-- 初回用名前入力 -->
 <div id="setup-overlay">
     <div class="setup-box">
-        <h3>Welcome Master!</h3>
-        <p>What's your name?</p>
-        <input type="text" id="setup-name" style="width:80%; padding:10px; margin:15px; border-radius:10px; border:1px solid #ddd;" placeholder="Your Name">
+        <h3>Welcome!</h3>
+        
+        <label>Your Name (あなたの名前):</label>
+        <input type="text" id="setup-user-name" placeholder="例: Master">
+        
+        <label>Avatar Name (彼女の名前):</label>
+        <input type="text" id="setup-ai-name" placeholder="例: ASTREIA">
+        
         <br>
         <button id="send-btn" style="width:100%" onclick="completeSetup()">Start</button>
     </div>
@@ -145,71 +154,63 @@
     const input = document.getElementById('user-input');
     const micBtn = document.getElementById('mic-btn');
 
-    // --- 音声ロック強制解除ロジック ---
     let audioUnlocked = false;
     function unlockAudio() {
         if (!audioUnlocked) {
             const silent = new SpeechSynthesisUtterance("");
             window.speechSynthesis.speak(silent);
             audioUnlocked = true;
-            console.log("Audio Unlocked");
         }
     }
 
-    // --- 初回セットアップ判定 ---
     {% if first_launch %}
     document.getElementById('setup-overlay').style.display = 'flex';
     {% endif %}
 
     async function completeSetup() {
-        unlockAudio(); // ここで音声を許可
-        const name = document.getElementById('setup-name').value;
-        if (!name) return;
+        unlockAudio();
+        const userName = document.getElementById('setup-user-name').value;
+        const aiName = document.getElementById('setup-ai-name').value || "ASTREIA";
+        
+        if (!userName) { alert("Please enter your name!"); return; }
         
         await fetch('/setup', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name})
+            body: JSON.stringify({name: userName, ai_name: aiName})
         });
+        
         document.getElementById('setup-overlay').style.display = 'none';
         display.style.display = 'block';
-        display.innerText = "Hi! I'm ASTREIA. Nice to meet you!";
-        speak("Hi! I am ASTREIA. Nice to meet you!");
+        display.innerText = `Hi! I'm ${aiName}. Nice to meet you, ${userName}!`;
+        speak(`Hi! I am ${aiName}. Nice to meet you, ${userName}!`);
     }
 
-    // --- 音声認識 ---
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'en-US';
-    recognition.interimResults = false;
 
     function startRecognition() {
-        unlockAudio(); // マイクを叩いた瞬間に音声再生を許可
+        unlockAudio();
         try {
             recognition.start();
             micBtn.classList.add('active');
-            input.placeholder = "Listening...";
-        } catch (e) { console.log("Mic already active"); }
+        } catch (e) {}
     }
 
     recognition.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        input.value = text;
+        input.value = event.results[0][0].transcript;
         sendMessage();
     };
 
-    recognition.onend = () => {
-        micBtn.classList.remove('active');
-        input.placeholder = "Message...";
-    };
+    recognition.onend = () => micBtn.classList.remove('active');
 
-    // --- チャット送信 ---
     async function sendMessage() {
-        unlockAudio(); // 送信ボタンでもロック解除
+        unlockAudio();
         const text = input.value;
         if (!text) return;
 
         display.style.display = 'block';
-        display.innerText = "Thinking...";
+        display.innerText = "...";
         input.value = "";
         
         try {
@@ -219,7 +220,6 @@
                 body: JSON.stringify({message: text})
             });
             const data = await response.json();
-            
             display.innerText = data.response;
             speak(data.response);
         } catch (e) {
@@ -227,16 +227,15 @@
         }
     }
 
-    // --- 音声合成 ---
+    // --- 音声設定の調整 (ここが重要です) ---
     function speak(text) {
         window.speechSynthesis.cancel();
         const uttr = new SpeechSynthesisUtterance(text);
         uttr.lang = 'en-US';
-        uttr.rate = 1.0;
-        uttr.pitch = 1.1; // 17歳らしく
         
-        uttr.onstart = () => console.log("ASTREIA is speaking...");
-        uttr.onerror = (e) => console.error("Speech error:", e);
+        // 元気で明るい声にするための設定
+        uttr.rate = 1.1;  // 少し早口にして、弾むような感じに（1.0〜1.2がおすすめ）
+        uttr.pitch = 1.3; // 声を高くして、若々しく明るい印象に（1.0〜1.5がおすすめ）
         
         window.speechSynthesis.speak(uttr);
     }
